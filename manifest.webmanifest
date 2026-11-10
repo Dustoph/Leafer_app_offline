@@ -1,0 +1,1 @@
+{"name":"LeafCare — Plant Doctor","short_name":"LeafCare","description":"Offline on-device plant disease detection. Snap a leaf, get healthy/diseased + care tips.","start_url":".","scope":".","display":"standalone","orientation":"portrait","background_color":"#f6f4e9","theme_color":"#1b5e20","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}]}
