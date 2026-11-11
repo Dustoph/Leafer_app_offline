@@ -241,8 +241,8 @@
     const id = seg.labels[y * seg.w + x];
     if (id >= 0) return seg.comps.findIndex(c => c.id === id);
     // tapped a lesion, vein or stem gap inside the leaf: take the nearest
-    // labeled pixel within 5% of the frame instead of reporting a miss
-    const R = Math.max(8, Math.round(Math.min(seg.w, seg.h) * 0.05));
+    // labeled pixel within a finger-sized radius instead of reporting a miss
+    const R = Math.max(24, Math.round(Math.min(seg.w, seg.h) * 0.12));
     for (let r = 1; r <= R; r++) {
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {

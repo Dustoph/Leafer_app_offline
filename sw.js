@@ -1,5 +1,5 @@
 /* LeafCare service worker — full offline after first load. */
-const CACHE = 'leafcare-v11';
+const CACHE = 'leafcare-v12';
 const ASSETS = [
   './', './index.html', './css/main.css',
   './js/utils/dom.js', './js/utils/format.js', './js/utils/image.js',
