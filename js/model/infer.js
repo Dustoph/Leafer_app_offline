@@ -34,17 +34,36 @@ window.LeafInfer = (() => {
     return runModel(graphModel, t);
   }
 
-  // Test-time augmentation: average original + mirror. Orientation-only views:
-  // flips preserve the color balance this model is sensitive to, unlike brightness shifts.
-  // Smooths orientation quirks of casual phone shots without denting clean uploads.
+  function rotateCanvas(canvas, turns) {  // exact 90° steps, no border artifacts
+    if (turns % 4 === 0) return canvas;
+    const c = document.createElement('canvas');
+    c.width = canvas.height; c.height = canvas.width;
+    const x = c.getContext('2d');
+    x.translate(c.width / 2, c.height / 2);
+    x.rotate((turns % 4) * Math.PI / 2);
+    x.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+    return c;
+  }
+
+  // Test-time augmentation, conditional: base vote (original + mirror) wins whenever
+  // it is confident, so clean uploads behave exactly as before. Quarter-turn views
+  // run only when the base vote is uncertain (sideways-held phone) — and a rotated
+  // view may only confirm the base vote's leading class, never invent a new
+  // confident answer (a rotated tomato leaf can look like an apple leaf).
   async function predictAvg(graphModel, canvas) {
-    const views = ['orig', 'flip'];
-    const acc = new Array(38).fill(0);
-    for (const v of views) {
-      const p = await runModel(graphModel, tensorFromCanvas(canvas, v));
-      for (let i = 0; i < 38; i++) acc[i] += p[i] / views.length;
+    const base = await runModel(graphModel, tensorFromCanvas(canvas, 'orig'));
+    const flip = await runModel(graphModel, tensorFromCanvas(canvas, 'flip'));
+    const acc = base.map((p, i) => (p + flip[i]) / 2);
+    if (Math.max(...acc) >= 0.6) return acc;
+    const topCls = acc.indexOf(Math.max(...acc));
+    let best = acc, bestConf = Math.max(...acc);
+    for (const turns of [1, 3]) {
+      const p = await runModel(graphModel, tensorFromCanvas(rotateCanvas(canvas, turns), 'orig'));
+      if (p.indexOf(Math.max(...p)) === topCls && Math.max(...p) > bestConf) {
+        best = p; bestConf = Math.max(...p);
+      }
     }
-    return acc;
+    return best;
   }
 
   return { unwrap, predict, predictAvg };

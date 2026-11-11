@@ -25,13 +25,19 @@ window.LeafPages.scan = (() => {
     async function analyze() {
       if (!currentPhoto) return;
       const btn = $('analyzeBtn');
-      if (!deps.isModelReady()) {
-        $('status').textContent = 'AI still loading — one moment…';
-        return;
-      }
       btn.disabled = true;
-      $('status').textContent = 'Adjusting photo to lab conditions…';
       try {
+        if (!deps.isModelReady()) {
+          $('status').textContent = 'First run: downloading the on-device brain (~15 MB, once) — keep this page open…';
+          try { await deps.bootModel(); }
+          catch (e) {
+            $('status').textContent = 'Download failed (' + (e.message || 'network') + ') — check connection and tap 🔍 again.';
+            btn.disabled = false;
+            return;
+          }
+        }
+      $('status').textContent = 'Adjusting photo to lab conditions…';
+      {
         const img = await LeafImage.loadImage(currentPhoto);
         // normalize the phone shot, then gate on capture quality
         const { canvas, quality } = LeafPre.preprocessFromImage(img);
@@ -41,9 +47,29 @@ window.LeafPages.scan = (() => {
           return;
         }
         $('status').textContent = 'Analyzing on your phone…';
-        const probs = await LeafInfer.predictAvg(deps.model.graphModel, canvas);
-        const pred = probs.indexOf(Math.max(...probs));
+        // two reads, disagreement protocol: the plain resize and the normalized
+        // crop vote independently; a confident agreement wins, a split with no
+        // confident winner is reported unsure instead of a guess.
+        const plainProbs = await LeafInfer.predict(deps.model.graphModel, img);
+        const normProbs = await LeafInfer.predictAvg(deps.model.graphModel, canvas);
+        const topOf = p => p.indexOf(Math.max(...p));
+        const pTop = topOf(plainProbs), nTop = topOf(normProbs);
+        const pConf = plainProbs[pTop], nConf = normProbs[nTop];
+        let probs, agreeNote = '';
+        if (pTop === nTop) {
+          probs = plainProbs.map((p, i) => Math.max(p, normProbs[i]));
+        } else if (Math.max(pConf, nConf) >= 0.85) {
+          probs = pConf >= nConf ? plainProbs : normProbs;
+          agreeNote = '⚠️ Two framings disagreed — showing the confident read.';
+        } else {
+          probs = pConf >= nConf ? plainProbs : normProbs;
+          // force honest uncertainty: cap confidence below the verdict threshold
+          probs = probs.map((p, i) => (i === (pConf >= nConf ? pTop : nTop) ? 0.55 : p * 0.4));
+          agreeNote = '⚠️ Conflicting reads — angle or light may be off; retake straight-on in daylight.';
+        }
+        const pred = topOf(probs);
         const r = LeafLogic.buildResult(pred, probs, deps.model.labels, deps.model.advice);
+        if (agreeNote) r.note = (r.note ? r.note + ' ' : '') + agreeNote;
         if (quality.glary) r.note = (r.note ? r.note + ' ' : '') + '⚠️ Glare spotted — result less certain, try shade.';
         else if (quality.adjusted || quality.cropped) r.note = (r.note ? r.note + ' ' : '') + '✨ Auto-adjusted framing/lighting.';
         renderResult(r);
@@ -53,6 +79,7 @@ window.LeafPages.scan = (() => {
           healthy: r.healthy, conf: +r.conf.toFixed(4), verdict: r.verdict
         });
         $('status').textContent = '';
+        }
       } catch (e) {
         $('status').textContent = 'Analysis failed: ' + e.message;
       }

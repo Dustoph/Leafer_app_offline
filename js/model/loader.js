@@ -10,10 +10,11 @@ window.LeafLoader = (() => {
     ]);
     if (!Array.isArray(labels) || labels.length !== 38) throw new Error('expected 38 labels, got ' + (labels && labels.length));
     say('loading plant model…');
+    const waits = [2000, 5000, 10000, 20000];
     let lastErr = null;
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    for (let attempt = 1; attempt <= 5; attempt++) {
       try {
-        if (attempt > 1) say(`loading plant model… (retry ${attempt})`);
+        if (attempt > 1) say(`still downloading… (attempt ${attempt}/5 — keep this page open)`);
         const graphModel = await tf.loadGraphModel(modelUrl);
         if (!graphModel) throw new Error('model failed to load');
         // warmup so the first real scan is fast
@@ -21,7 +22,7 @@ window.LeafLoader = (() => {
         const out = graphModel.execute(z);
         tf.dispose(Array.isArray(out) ? out.concat([z]) : [out, z]);
         return { graphModel, labels, advice };
-      } catch (e) { lastErr = e; await new Promise(r => setTimeout(r, 1500)); }
+      } catch (e) { lastErr = e; await new Promise(r => setTimeout(r, waits[attempt - 1] || 20000)); }
     }
     throw lastErr;
   }

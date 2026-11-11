@@ -49,7 +49,7 @@
     return { data: out, w: px.w, h: px.h };
   }
 
-  function equalizeLuma(px, strength = 0.5) {  // soften harsh shadows / hotspots, keep hue
+  function equalizeLuma(px, strength = 0.5) {  // global histogram equalization on luma, keep hue
     const { data, w, h } = px;
     const n = w * h, luma = new Float32Array(n), hist = new Uint32Array(256);
     for (let p = 0; p < n; p++) {
@@ -102,7 +102,6 @@
     return n / total;
   }
 
-  // ---- browser-only thin glue: element -> normalized 128x128 canvas + quality ----
   function preprocessFromImage(img) {
     const src = document.createElement('canvas');
     const s = Math.min(1, 1024 / Math.max(img.width, img.height));
@@ -115,12 +114,13 @@
     const sharp = sharpness(px), gl = glare(px);
     const quality = { sharp, glare: gl, blurry: sharp < SHARP_MIN, glary: gl > GLARE_MAX, cropped: false, adjusted: false };
     const box = excessGreenBBox(px);
+    const work = src;
     let dx = 0, dy = 0, ds = Math.min(src.width, src.height);
     if (box) { dx = box.x; dy = box.y; ds = box.s; quality.cropped = true; }
     const out = document.createElement('canvas');
     out.width = 128; out.height = 128;
     const octx = out.getContext('2d', { willReadFrequently: true });
-    octx.drawImage(src, dx, dy, ds, ds, 0, 0, 128, 128);
+    octx.drawImage(work, dx, dy, ds, ds, 0, 0, 128, 128);
     let q = { data: octx.getImageData(0, 0, 128, 128).data, w: 128, h: 128 };
     const before = [q.data[4], q.data[5], q.data[6]];
     q = equalizeLuma(grayWorld(q));
