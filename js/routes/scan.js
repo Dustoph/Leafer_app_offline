@@ -20,6 +20,23 @@ window.LeafPages.scan = (() => {
     };
     $('camInput').onchange = e => pick(e.target.files[0]);
     $('photoInput').onchange = e => pick(e.target.files[0]);
+    // drag & drop onto the preview frame (desktop + mobile browsers that allow it)
+    const zone = $('dropZone');
+    if (zone) {
+      ['dragenter', 'dragover'].forEach(ev => zone.addEventListener(ev, e => {
+        e.preventDefault();
+        zone.classList.add('dropZoneDrag');
+      }));
+      ['dragleave', 'drop'].forEach(ev => zone.addEventListener(ev, e => {
+        e.preventDefault();
+        zone.classList.remove('dropZoneDrag');
+      }));
+      zone.addEventListener('drop', e => {
+        const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f && (f.type.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(f.name))) pick(f);
+        else $('status').textContent = 'That drop did not contain an image — try a JPG or PNG leaf photo.';
+      });
+    }
     $('analyzeBtn').onclick = analyze;
 
     async function analyze() {

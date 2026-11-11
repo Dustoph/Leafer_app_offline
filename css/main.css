@@ -36,6 +36,8 @@ main{flex:1;padding:1rem 1rem 5.5rem}
 .corners i:nth-child(4){bottom:0;right:0;border-left:0;border-top:0;border-radius:0 0 8px 0}
 .tips{font-size:.85rem}.tips summary{cursor:pointer;font-weight:600;color:var(--leaf)}
 .tips ul{margin:.5rem 0 0;padding-left:1.2rem}.tips li{margin:.25rem 0}
+.dropZoneDrag{outline:3px dashed var(--leaf2);outline-offset:-6px;background:#e3f0da}
+.dropZoneDrag .corners i{opacity:1}
 .hidden{display:none!important}
 .btnrow{display:flex;gap:.6rem;margin-bottom:.7rem}
 .btn{flex:1;text-align:center;background:#e8f0e2;color:var(--leaf);font-weight:600;
