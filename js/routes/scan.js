@@ -41,7 +41,7 @@ window.LeafPages.scan = (() => {
           return;
         }
         $('status').textContent = 'Analyzing on your phone…';
-        const probs = await LeafInfer.predictAvg(deps.model.tfliteModel, canvas);
+        const probs = await LeafInfer.predictAvg(deps.model.graphModel, canvas);
         const pred = probs.indexOf(Math.max(...probs));
         const r = LeafLogic.buildResult(pred, probs, deps.model.labels, deps.model.advice);
         if (quality.glary) r.note = (r.note ? r.note + ' ' : '') + '⚠️ Glare spotted — result less certain, try shade.';

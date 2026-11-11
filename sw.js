@@ -1,5 +1,5 @@
 /* LeafCare service worker — full offline after first load. */
-const CACHE = 'leafcare-v6';
+const CACHE = 'leafcare-v7';
 const ASSETS = [
   './', './index.html', './css/main.css',
   './js/utils/dom.js', './js/utils/format.js', './js/utils/image.js',
@@ -12,13 +12,10 @@ const ASSETS = [
   './pages/scan.html', './pages/history.html', './pages/profile.html',
   './data/labels.json', './data/advice.json',
   './manifest.webmanifest', './icon.svg',
-  './vendor/tf.min.js', './vendor/tf-tflite.min.js',
-  './vendor/wasm/tflite_web_api_cc.js',
-  './vendor/wasm/tflite_web_api_cc.wasm',
-  './vendor/wasm/tflite_web_api_cc_simd.js',
-  './vendor/wasm/tflite_web_api_cc_simd.wasm',
-  './vendor/wasm/tflite_web_api_client.js',
-  './model/plant_model.tflite'
+  './vendor/tf.min.js',
+  './model/tfjs/model.json',
+  './model/tfjs/group1-shard1of4.bin', './model/tfjs/group1-shard2of4.bin',
+  './model/tfjs/group1-shard3of4.bin', './model/tfjs/group1-shard4of4.bin'
 ];
 
 self.addEventListener('install', e => {
