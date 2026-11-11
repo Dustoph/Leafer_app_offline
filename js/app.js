@@ -19,7 +19,7 @@
   // silent background boot of the on-device model
   const badge = document.getElementById('modelBadge');
   LeafLoader.load({
-    wasmBase: 'vendor/', modelUrl: 'model/plant_model.tflite',
+   modelUrl: 'model/tfjs/model.json',
     labelsUrl: 'data/labels.json', adviceUrl: 'data/advice.json',
     onStep: s => { badge.textContent = s; }
   }).then(m => {
