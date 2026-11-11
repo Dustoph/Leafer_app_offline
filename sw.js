@@ -1,23 +1,18 @@
 /* LeafCare service worker — full offline after first load. */
-const CACHE = 'leafcare-v5';
+const CACHE = 'leafcare-v6';
 const ASSETS = [
   './', './index.html', './css/main.css',
   './js/utils/dom.js', './js/utils/format.js', './js/utils/image.js',
   './js/logic.js',
   './js/db/storage.js', './js/db/profiles.js', './js/db/history.js',
   './js/middleware/guards.js',
-  './js/model/loader.js', './js/model/infer.js',
+  './js/model/loader.js', './js/model/infer.js', './js/model/preprocess.js',
   './js/routes/router.js', './js/routes/scan.js', './js/routes/history.js', './js/routes/profile.js',
   './js/app.js',
   './pages/scan.html', './pages/history.html', './pages/profile.html',
   './data/labels.json', './data/advice.json',
   './manifest.webmanifest', './icon.svg',
   './vendor/tf.min.js', './vendor/tf-tflite.min.js',
-  './vendor/tflite_web_api_cc.js',
-  './vendor/tflite_web_api_cc.wasm',
-  './vendor/tflite_web_api_cc_simd.js',
-  './vendor/tflite_web_api_cc_simd.wasm',
-  './vendor/tflite_web_api_client.js',
   './vendor/wasm/tflite_web_api_cc.js',
   './vendor/wasm/tflite_web_api_cc.wasm',
   './vendor/wasm/tflite_web_api_cc_simd.js',

@@ -27,6 +27,15 @@ main{flex:1;padding:1rem 1rem 5.5rem}
   border:2px dashed #9ccc9c;background:#f1f7ec}
 .hero img{max-width:100%;max-height:300px;border-radius:12px}
 .dropHint{text-align:center;color:var(--muted);font-size:1rem;line-height:2}
+.frameGuide{position:relative;overflow:hidden}
+.corners{position:absolute;inset:10px;pointer-events:none}
+.corners i{position:absolute;width:26px;height:26px;border:3px solid var(--leaf2);opacity:.55}
+.corners i:nth-child(1){top:0;left:0;border-right:0;border-bottom:0;border-radius:8px 0 0 0}
+.corners i:nth-child(2){top:0;right:0;border-left:0;border-bottom:0;border-radius:0 8px 0 0}
+.corners i:nth-child(3){bottom:0;left:0;border-right:0;border-top:0;border-radius:0 0 0 8px}
+.corners i:nth-child(4){bottom:0;right:0;border-left:0;border-top:0;border-radius:0 0 8px 0}
+.tips{font-size:.85rem}.tips summary{cursor:pointer;font-weight:600;color:var(--leaf)}
+.tips ul{margin:.5rem 0 0;padding-left:1.2rem}.tips li{margin:.25rem 0}
 .hidden{display:none!important}
 .btnrow{display:flex;gap:.6rem;margin-bottom:.7rem}
 .btn{flex:1;text-align:center;background:#e8f0e2;color:var(--leaf);font-weight:600;

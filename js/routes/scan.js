@@ -30,12 +30,22 @@ window.LeafPages.scan = (() => {
         return;
       }
       btn.disabled = true;
-      $('status').textContent = 'Analyzing on your phone…';
+      $('status').textContent = 'Adjusting photo to lab conditions…';
       try {
         const img = await LeafImage.loadImage(currentPhoto);
-        const probs = await LeafInfer.predict(deps.model.tfliteModel, img);
+        // normalize the phone shot, then gate on capture quality
+        const { canvas, quality } = LeafPre.preprocessFromImage(img);
+        if (quality.blurry) {
+          $('status').textContent = `Photo looks blurry (sharpness ${quality.sharp.toFixed(0)} < ${LeafPre.SHARP_MIN}) — hold steady, tap to focus, and retake.`;
+          btn.disabled = false;
+          return;
+        }
+        $('status').textContent = 'Analyzing on your phone…';
+        const probs = await LeafInfer.predictAvg(deps.model.tfliteModel, canvas);
         const pred = probs.indexOf(Math.max(...probs));
         const r = LeafLogic.buildResult(pred, probs, deps.model.labels, deps.model.advice);
+        if (quality.glary) r.note = (r.note ? r.note + ' ' : '') + '⚠️ Glare spotted — result less certain, try shade.';
+        else if (quality.adjusted || quality.cropped) r.note = (r.note ? r.note + ' ' : '') + '✨ Auto-adjusted framing/lighting.';
         renderResult(r);
         deps.history.add({
           image: await LeafImage.makeThumb(currentPhoto),
