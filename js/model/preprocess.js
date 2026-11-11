@@ -254,7 +254,14 @@
         }
       }
     }
-    return -1;
+    // still nothing green nearby (big lesion / dead zone): fall back to the
+    // nearest leaf by centroid, unless everything is far away (true background)
+    let bi = -1, bd = Math.min(seg.w, seg.h) * 0.35;
+    seg.comps.forEach((c, i) => {
+      const d = Math.hypot(c.cx - x, c.cy - y);
+      if (d < bd) { bd = d; bi = i; }
+    });
+    return bi;
   }
 
   // 128px model input from arbitrary pixels: tight square of the mask bbox on
