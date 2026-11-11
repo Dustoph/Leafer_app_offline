@@ -239,8 +239,22 @@
     x |= 0; y |= 0;
     if (x < 0 || y < 0 || x >= seg.w || y >= seg.h) return -1;
     const id = seg.labels[y * seg.w + x];
-    if (id < 0) return -1;
-    return seg.comps.findIndex(c => c.id === id);
+    if (id >= 0) return seg.comps.findIndex(c => c.id === id);
+    // tapped a lesion, vein or stem gap inside the leaf: take the nearest
+    // labeled pixel within 5% of the frame instead of reporting a miss
+    const R = Math.max(8, Math.round(Math.min(seg.w, seg.h) * 0.05));
+    for (let r = 1; r <= R; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const xx = x + dx, yy = y + dy;
+          if (xx < 0 || yy < 0 || xx >= seg.w || yy >= seg.h) continue;
+          const nid = seg.labels[yy * seg.w + xx];
+          if (nid >= 0) return seg.comps.findIndex(c => c.id === nid);
+        }
+      }
+    }
+    return -1;
   }
 
   // 128px model input from arbitrary pixels: tight square of the mask bbox on
