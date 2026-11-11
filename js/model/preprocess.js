@@ -130,5 +130,161 @@
     return { canvas: out, quality };
   }
 
-  root.LeafPre = { SHARP_MIN, GLARE_MAX, excessGreenBBox, grayWorld, equalizeLuma, sharpness, glare, preprocessFromImage };
+  function otsuCut(hist, total) {  // classic Otsu threshold on 0..255 histogram
+    let sum = 0;
+    for (let i = 0; i < 256; i++) sum += i * hist[i];
+    let sumB = 0, wB = 0, best = 0, bestV = -1;
+    for (let t = 0; t < 256; t++) {
+      wB += hist[t]; if (!wB) continue;
+      const wF = total - wB; if (!wF) break;
+      sumB += t * hist[t];
+      const v = (sumB / wB - (sum - sumB) / wF) ** 2 * wB * wF;
+      if (v > bestV) { bestV = v; best = t; }
+    }
+    return best;
+  }
+
+  function open3(bin, w, h) {  // 3x3 morphological open: drops speckle noise
+    const er = new Uint8Array(w * h), out = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let m = 1;
+      for (let dy = -1; dy <= 1 && m; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const xx = x + dx, yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= w || yy >= h || !bin[yy * w + xx]) { m = 0; break; }
+      }
+      er[y * w + x] = m;
+    }
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let m = 0;
+      for (let dy = -1; dy <= 1 && !m; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const xx = x + dx, yy = y + dy;
+        if (xx >= 0 && yy >= 0 && xx < w && yy < h && er[yy * w + xx]) { m = 1; break; }
+      }
+      out[y * w + x] = m;
+    }
+    return out;
+  }
+
+  // Single-leaf segmentation for plant-in-the-wild shots: excess-green + Otsu,
+  // hole-fill (diseased brown patches must not punch holes), connected
+  // components scored by size x centrality. Returns per-pixel labels so a tap
+  // can reselect the subject leaf.
+  function segmentLeaf(px) {
+    const { data, w, h } = px, n = w * h;
+    const hist = new Uint32Array(256), exg = new Uint8Array(n);
+    for (let p = 0; p < n; p++) {
+      const i = p * 4;
+      exg[p] = Math.max(0, Math.min(255, 2 * data[i + 1] - data[i] - data[i + 2]));
+      hist[exg[p]]++;
+    }
+    const cut = otsuCut(hist, n);
+    let fg = open3(exg.map(v => (v > cut ? 1 : 0)), w, h);
+    // fill holes: background reachable from the frame border stays background
+    const seen = new Uint8Array(n), q = [];
+    for (let x = 0; x < w; x++) { q.push(x, (h - 1) * w + x); }
+    for (let y = 0; y < h; y++) { q.push(y * w, y * w + w - 1); }
+    while (q.length) {
+      const p = q.pop(), x = p % w, y = (p / w) | 0;
+      if (x < 0 || y < 0 || x >= w || y >= h || seen[p] || fg[p]) continue;
+      seen[p] = 1;
+      q.push(p - 1, p + 1, p - w, p + w);
+    }
+    for (let p = 0; p < n; p++) if (!fg[p] && !seen[p]) fg[p] = 1; // holes -> leaf
+    // connected components (4-neighbourhood) with area + centroid
+    const labels = new Int32Array(n).fill(-1);
+    const comps = [];
+    for (let s = 0; s < n; s++) {
+      if (!fg[s] || labels[s] !== -1) continue;
+      const id = comps.length, st = [s]; labels[s] = id;
+      let area = 0, sx = 0, sy = 0;
+      while (st.length) {
+        const p = st.pop(), x = p % w, y = (p / w) | 0;
+        area++; sx += x; sy += y;
+        const nb = [p - 1, p + 1, p - w, p + w];
+        for (const m of nb) {
+          const mx = m % w, my = (m / w) | 0;
+          if (mx < 0 || my < 0 || mx >= w || my >= h || !fg[m] || labels[m] !== -1) continue;
+          if (Math.abs(mx - x) + Math.abs(my - y) !== 1) continue;
+          labels[m] = id; st.push(m);
+        }
+      }
+      if (area >= n * 0.005) comps.push({ id, area, cx: sx / area, cy: sy / area });
+    }
+    const cx0 = w / 2, cy0 = h / 2, maxD = Math.hypot(cx0, cy0) || 1;
+    let best = -1, bestScore = -1;
+    comps.forEach((c, idx) => {
+      const areaFrac = c.area / n;
+      if (areaFrac < 0.04) return; // speckle, not a subject leaf
+      const centrality = 1 - Math.hypot(c.cx - cx0, c.cy - cy0) / maxD;
+      const score = 0.65 * Math.min(1, areaFrac / 0.5) + 0.35 * centrality;
+      if (score > bestScore) { bestScore = score; best = idx; }
+    });
+    const coverage = best >= 0 ? comps[best].area / n : 0;
+    const runner = comps.reduce((m, c, i) => (i !== best ? Math.max(m, c.area) : m), 0);
+    const confident = best >= 0 && coverage >= 0.06 && coverage <= 0.92 &&
+      (comps.length === 1 || comps[best].area >= 2 * (runner || 1));
+    return { labels, comps, best, coverage, confident, w, h };
+  }
+
+  function maskOf(seg, idx) {  // binary mask of one component (default: best)
+    const id = idx === undefined || idx < 0 ? seg.best : idx;
+    const out = new Uint8Array(seg.w * seg.h);
+    if (id < 0) return out;
+    const want = seg.comps[id].id;
+    for (let p = 0; p < out.length; p++) if (seg.labels[p] === want) out[p] = 1;
+    return out;
+  }
+
+  function selectComponent(seg, x, y) {  // tap-to-select: component under a point
+    x |= 0; y |= 0;
+    if (x < 0 || y < 0 || x >= seg.w || y >= seg.h) return -1;
+    const id = seg.labels[y * seg.w + x];
+    if (id < 0) return -1;
+    return seg.comps.findIndex(c => c.id === id);
+  }
+
+  // 128px model input from arbitrary pixels: tight square of the mask bbox on
+  // the NATURAL background (this model keys on background texture — never
+  // replace it with a flat fill) + the usual light leveling.
+  // Returns raw + normalized views plus the crop rect for display.
+  function canvasFromPixels(px, mask) {
+    let sx = 0, sy = 0, side = Math.min(px.w, px.h);
+    if (mask) {
+      let x0 = px.w, y0 = px.h, x1 = -1, y1 = -1;
+      for (let y = 0; y < px.h; y++) for (let x = 0; x < px.w; x++) {
+        if (!mask[y * px.w + x]) continue;
+        if (x < x0) x0 = x; if (x > x1) x1 = x;
+        if (y < y0) y0 = y; if (y > y1) y1 = y;
+      }
+      if (x1 >= 0) {
+        const pad = Math.round(Math.max(x1 - x0, y1 - y0) * 0.04) + 2;
+        x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad);
+        x1 = Math.min(px.w - 1, x1 + pad); y1 = Math.min(px.h - 1, y1 + pad);
+        side = Math.max(x1 - x0 + 1, y1 - y0 + 1);
+        const cx = (x0 + x1 + 1) / 2, cy = (y0 + y1 + 1) / 2;
+        sx = Math.max(0, Math.min(px.w - side, Math.round(cx - side / 2)));
+        sy = Math.max(0, Math.min(px.h - side, Math.round(cy - side / 2)));
+        side = Math.min(side, px.w - sx, px.h - sy);
+      }
+    }
+    const src = document.createElement('canvas');
+    src.width = px.w; src.height = px.h;
+    src.getContext('2d').putImageData(new ImageData(px.data, px.w, px.h), 0, 0);
+    const raw = document.createElement('canvas');
+    raw.width = 128; raw.height = 128;
+    raw.getContext('2d').drawImage(src, sx, sy, side, side, 0, 0, 128, 128);
+    const norm = document.createElement('canvas');
+    norm.width = 128; norm.height = 128;
+    const nctx = norm.getContext('2d', { willReadFrequently: true });
+    nctx.drawImage(raw, 0, 0);
+    let q = { data: nctx.getImageData(0, 0, 128, 128).data, w: 128, h: 128 };
+    const before = [q.data[4], q.data[5], q.data[6]];
+    q = equalizeLuma(grayWorld(q));
+    const after = [q.data[4], q.data[5], q.data[6]];
+    const adjusted = before.some((v, i) => Math.abs(v - after[i]) > 2);
+    nctx.putImageData(new ImageData(q.data, 128, 128), 0, 0);
+    return { raw, norm, adjusted, rect: { sx, sy, side } };
+  }
+  root.LeafPre = { SHARP_MIN, GLARE_MAX, excessGreenBBox, grayWorld, equalizeLuma, sharpness, glare, preprocessFromImage,
+    otsuCut, segmentLeaf, maskOf, selectComponent, canvasFromPixels };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -4,13 +4,17 @@
   <div class="corners" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
 </div>
 <details class="card tips"><summary>📸 For best results (the app auto-fixes the rest)</summary>
-<ul><li>The app auto-corrects <b>light color, framing and sideways shots</b>.</li>
-<li>Just fill the frame with <b>one leaf</b> and shoot <b>roughly straight-on</b>.</li>
-<li>Skip flash; <b>soft daylight</b> beats harsh shadow.</li></ul></details>
+<ul><li>The app <b>isolates your leaf</b> from background foliage and corrects light color.</li>
+<li>If it picks the wrong leaf, <b>tap yours</b> in the photo.</li>
+<li>Shoot <b>roughly straight-on</b> in <b>soft daylight</b>, no flash.</li></ul></details>
 <div class="btnrow">
   <label class="btn primary">📷 Camera<input id="camInput" type="file" accept="image/*" capture="environment" hidden></label>
   <label class="btn">🖼️ Gallery<input id="photoInput" type="file" accept="image/*" hidden></label>
 </div>
 <button id="analyzeBtn" class="btn analyze" disabled>🔍 Analyze leaf</button>
+<div id="leafConfirm" class="card hidden">
+  <div id="tapHint" class="muted"></div>
+  <div class="btnrow" style="margin-top:.5rem"><button id="retakeBtn" class="btn">↩ New photo</button></div>
+</div>
 <div id="status" class="status"></div>
 <div id="resultCard" class="card result hidden"></div>
